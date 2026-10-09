@@ -1,0 +1,6 @@
+# Built packages are uploaded to GitHub Releases, not committed
+*.vsix
+
+# Python cache
+__pycache__/
+*.pyc

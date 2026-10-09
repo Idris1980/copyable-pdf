@@ -1,0 +1,89 @@
+{
+  "name": "copyable-pdf",
+  "displayName": "Markdown to Copyable PDF",
+  "description": "Turns Markdown into an A4 PDF with Edge or Chrome, where every code line can be copied in full. Long commands are split automatically, with page numbers and offline Mermaid diagrams.",
+  "version": "2.2.0",
+  "publisher": "idris1980",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": { "type": "git", "url": "https://github.com/Idris1980/copyable-pdf" },
+  "homepage": "https://github.com/Idris1980/copyable-pdf#readme",
+  "bugs": { "url": "https://github.com/Idris1980/copyable-pdf/issues" },
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Other"],
+  "keywords": ["markdown", "pdf", "readme", "copy", "code"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:markdown"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "copyablePdf.create",
+        "title": "Create Copyable PDF",
+        "category": "Markdown",
+        "icon": "$(file-pdf)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        { "command": "copyablePdf.create", "when": "resourceLangId == markdown", "group": "navigation" }
+      ],
+      "editor/context": [
+        { "command": "copyablePdf.create", "when": "resourceLangId == markdown", "group": "navigation" }
+      ],
+      "explorer/context": [
+        { "command": "copyablePdf.create", "when": "resourceExtname == .md", "group": "navigation" }
+      ],
+      "commandPalette": [
+        { "command": "copyablePdf.create", "when": "resourceLangId == markdown" }
+      ]
+    },
+    "configuration": {
+      "title": "Copyable PDF",
+      "properties": {
+        "copyablePdf.maxCodeLine": {
+          "type": "number",
+          "default": 95,
+          "minimum": 40,
+          "description": "Longest code line that fits on an A4 line. Longer lines are split automatically or get a warning."
+        },
+        "copyablePdf.autoSplit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Split long commands with the continuation character in the PDF, so they can be copied. The Markdown file is not changed."
+        },
+        "copyablePdf.defaultShell": {
+          "type": "string",
+          "enum": ["powershell", "bash", "cmd", "none"],
+          "enumDescriptions": ["Split with ` as in PowerShell", "Split with \\ as in Bash", "Split with ^ as in cmd", "Do not split code blocks without a language"],
+          "default": "powershell",
+          "description": "How code blocks without a language are split."
+        },
+        "copyablePdf.footer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the document title and \"Page 3 of 12\" in the footer."
+        },
+        "copyablePdf.openAfter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the PDF when it is ready."
+        },
+        "copyablePdf.verify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read the finished PDF with the same engine as Edge and check that every code line can be copied in full. Requires Python."
+        },
+        "copyablePdf.python": {
+          "type": "string",
+          "default": "python",
+          "description": "Python command used for the verification, for example python, python3 or py. If it does not work, python3, python and py are tried."
+        },
+        "copyablePdf.browserPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a Chromium browser (Edge, Chrome, Chromium or Brave) used to print the PDF. Empty means the usual locations are searched, Edge first."
+        }
+      }
+    }
+  }
+}
