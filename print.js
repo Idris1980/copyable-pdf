@@ -32,11 +32,15 @@ function expand(p) {
   return p.replace(/%([^%]+)%/g, (_, v) => process.env[v] || "").replace(/^~(?=\/)/, os.homedir());
 }
 
-/** A program name looked up on PATH, or null. */
+/** A program name looked up on PATH, or null. On Windows .exe, .cmd and so on are added. */
 function onPath(name) {
+  const endings = process.platform === "win32" && !path.extname(name)
+    ? (process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";").filter(Boolean) : [""];
   for (const dir of (process.env.PATH || "").split(path.delimiter)) {
-    const full = path.join(dir, name);
-    if (dir && fs.existsSync(full)) return full;
+    for (const ending of endings) {
+      const full = path.join(dir, name + ending);
+      if (dir && fs.existsSync(full)) return full;
+    }
   }
   return null;
 }
@@ -100,23 +104,41 @@ async function printPdf(html, pdfFile, browser) {
   }
 }
 
+// The Python found the first time, per setting, so the search is done once per VS Code session.
+const pythonCache = new Map();
+
 /**
- * Reads the PDF with PDFium through Python and looks for the code lines. Tries the user's Python
- * command first, then the usual names (python3 on macOS and Linux, py on Windows).
- * Returns null if no Python could run the check, or { missingModule: true } if pypdfium2 is missing.
+ * Finds a working Python 3: the user's command first, then python3, python and py.
+ * Commands that are not on the computer are skipped at once. The others get a short question
+ * (at most 10 seconds) and must answer as Python 3. On Windows this also skips the placeholder
+ * that only points to the Microsoft Store.
+ */
+async function findPython(custom) {
+  if (pythonCache.has(custom)) return pythonCache.get(custom);
+  let found = null;
+  for (const cmd of [...new Set([custom, "python3", "python", "py"].filter(Boolean))]) {
+    const full = fs.existsSync(expand(cmd)) ? expand(cmd) : onPath(cmd);
+    if (!full) continue;
+    const { stdout } = await run(full, ["-c", "import sys; print(sys.version_info[0])"], 10000);
+    if ((stdout || "").trim() === "3") { found = full; break; }
+  }
+  pythonCache.set(custom, found);
+  return found;
+}
+
+/**
+ * Reads the PDF with PDFium through Python and looks for the code lines.
+ * Returns null if no Python was found, or { missingModule: true } if pypdfium2 is missing.
  */
 async function verify(python, codeLines, pdfFile) {
+  const cmd = await findPython(python);
+  if (!cmd) return null;
   const list = path.join(os.tmpdir(), `copyable-pdf-lines-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(list, JSON.stringify(codeLines), "utf8");
   try {
-    for (const cmd of [...new Set([python, "python3", "python", "py"].filter(Boolean))]) {
-      const { stdout } = await run(cmd, [path.join(__dirname, "verify.py"), list, pdfFile], 60000);
-      try {
-        return JSON.parse(stdout);
-      } catch {
-        // This command did not work, try the next one.
-      }
-    }
+    const { stdout } = await run(cmd, [path.join(__dirname, "verify.py"), list, pdfFile], 60000);
+    return JSON.parse(stdout);
+  } catch {
     return null;
   } finally {
     fs.rmSync(list, { force: true });

@@ -9,7 +9,7 @@ Most Markdown PDF tools break long commands at the page edge. When someone copie
 Download the latest `copyable-pdf-x.y.z.vsix` from [Releases](https://github.com/Idris1980/copyable-pdf/releases), then either:
 
 - in VS Code: Extensions view → `...` menu → **Install from VSIX...**, or
-- in a terminal: `code --install-extension copyable-pdf-2.2.0.vsix`
+- in a terminal: `code --install-extension copyable-pdf-2.2.1.vsix`
 
 Reload VS Code afterwards (Command Palette → **Developer: Reload Window**).
 
@@ -64,7 +64,7 @@ No Node.js is needed. The extension is plain JavaScript, and `build.py` packages
 git clone https://github.com/Idris1980/copyable-pdf.git
 cd copyable-pdf
 python build.py
-code --install-extension copyable-pdf-2.2.0.vsix
+code --install-extension copyable-pdf-2.2.1.vsix
 ```
 
 ## License

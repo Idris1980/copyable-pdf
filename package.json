@@ -2,7 +2,7 @@
   "name": "copyable-pdf",
   "displayName": "Markdown to Copyable PDF",
   "description": "Turns Markdown into an A4 PDF with Edge or Chrome, where every code line can be copied in full. Long commands are split automatically, with page numbers and offline Mermaid diagrams.",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "publisher": "idris1980",
   "license": "MIT",
   "icon": "media/icon.png",
