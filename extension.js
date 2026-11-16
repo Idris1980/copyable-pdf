@@ -1,7 +1,7 @@
 // Markdown to Copyable PDF: the button in VS Code, the markers while typing and the messages afterwards.
 const path = require("path");
 const vscode = require("vscode");
-const { render, prepare, longCodeLines, splitLine, charFor } = require("./render");
+const { render, prepare, longCodeLines, splitLine, charFor, fitsAt, CODE_PT } = require("./render");
 const { findBrowser, printPdf, verify } = require("./print");
 
 const SOURCE = "Copyable PDF";
@@ -15,7 +15,26 @@ function setting(name) {
 }
 
 function options() {
-  return { split: setting("autoSplit"), defaultShell: setting("defaultShell") };
+  return {
+    split: setting("autoSplit"), defaultShell: setting("defaultShell"),
+    shrink: setting("shrinkLongLines"), minFontSize: setting("minCodeFontSize"),
+  };
+}
+
+/** Why a line could not be split or shrunk, and what to do about it. */
+function advice({ language, noLanguage, hasChar }, max, opts) {
+  const limit = opts.shrink ? fitsAt(max, opts.minFontSize) : max;
+  const tooLong = opts.shrink ? `Even at ${opts.minFontSize} pt only ${limit} characters fit on a line. ` : "";
+  if (noLanguage) {
+    return `${tooLong}Add a language to the code block (for example powershell) so it can be split automatically.`;
+  }
+  if (hasChar) {
+    return `${tooLong}It cannot be split automatically, probably because of a long quoted string. Shorten it to at most ${limit} characters.`;
+  }
+  const name = { yml: "YAML", yaml: "YAML", json: "JSON", sql: "SQL" }[language] || language;
+  const how = name === "YAML" ? ", for example in block style instead of {...} on one line" : "";
+  return `${tooLong}${name} has no continuation character, so the line cannot be split automatically. `
+    + `Break it over several lines in the file${how}, or shorten it to at most ${limit} characters.`;
 }
 
 function plural(n, one, many) {
@@ -30,7 +49,8 @@ function plural(n, one, many) {
 function updateDiagnostics(doc) {
   if (doc.languageId !== "markdown") return;
   const max = setting("maxCodeLine");
-  const { splitLines, unsplittable } = prepare(doc.getText(), max, options());
+  const opts = options();
+  const { splitLines, unsplittable, shrunkLines } = prepare(doc.getText(), max, opts);
   const failed = new Set(notCopyable.get(doc.uri.toString()) || []);
   const mark = (nr, text, severity) => {
     const line = doc.lineAt(nr - 1);
@@ -43,10 +63,12 @@ function updateDiagnostics(doc) {
     ...splitLines.map(({ line, parts, char }) => mark(line,
       `Code line too long for A4. It is split automatically over ${parts} lines with ${char} in the PDF. The Markdown file is not changed.`,
       vscode.DiagnosticSeverity.Information)),
-    ...unsplittable.map(({ line, length, noLanguage }) => {
-      const reason = noLanguage
-        ? "Add a language to the code block (for example powershell) so it can be split automatically."
-        : `It cannot be split automatically, probably because of a long quoted string. Shorten it to at most ${max} characters.`;
+    ...shrunkLines.map(({ line, length, size }) => mark(line,
+      `Code line is ${length} characters and cannot be split. Its code block is printed at ${size} pt instead of ${CODE_PT} pt, so every line fits and can be copied. The Markdown file is not changed.`,
+      vscode.DiagnosticSeverity.Information)),
+    ...unsplittable.map((item) => {
+      const { line, length } = item;
+      const reason = advice(item, max, opts);
       return failed.has(line)
         ? mark(line, `Code line is ${length} characters and cannot be copied in full from the PDF. ${reason}`, vscode.DiagnosticSeverity.Error)
         : mark(line, `Code line is ${length} characters and wraps in the PDF. ${reason}`, vscode.DiagnosticSeverity.Warning);
@@ -116,6 +138,7 @@ async function createPdf(uri) {
   await printPdf(render(prepared.text, mdFile, { footer: setting("footer") }), pdfFile, browser);
   log.appendLine(`PDF: ${pdfFile} (printed with ${browser})`);
   prepared.splitLines.forEach(({ line, parts }) => log.appendLine(`  line ${line}: split over ${parts} lines in the PDF`));
+  prepared.shrunkLines.forEach(({ line, length, size }) => log.appendLine(`  line ${line}: ${length} characters, block printed at ${size} pt`));
   prepared.unsplittable.forEach(({ line, length }) => log.appendLine(`  line ${line}: ${length} characters, could not be split`));
 
   let result = null, skipped = "";
@@ -140,6 +163,9 @@ function summary(pdfName, result, prepared, missing, skipped) {
   const parts = [`${pdfName} is ready${result ? ` (${plural(result.pages, "page", "pages")})` : ""}.`];
   if (prepared.splitLines.length) {
     parts.push(`${plural(prepared.splitLines.length, "long code line was", "long code lines were")} split in the PDF, the Markdown file is unchanged.`);
+  }
+  if (prepared.shrunkLines.length) {
+    parts.push(`${plural(prepared.shrunkLines.length, "code line", "code lines")} could not be split, so their code blocks were printed in a smaller font.`);
   }
   if (missing.length) parts.push(`${plural(missing.length, "code line", "code lines")} cannot be copied in full: line ${missing.join(", ")}.`);
   else if (result) parts.push("All code lines can be copied.");

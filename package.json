@@ -1,8 +1,8 @@
 {
   "name": "copyable-pdf",
   "displayName": "Markdown to Copyable PDF",
-  "description": "Turns Markdown into an A4 PDF with Edge or Chrome, where every code line can be copied in full. Long commands are split automatically, with page numbers and offline Mermaid diagrams.",
-  "version": "2.2.1",
+  "description": "Turns Markdown into an A4 PDF with Edge or Chrome, where every code line can be copied in full. Long commands are split automatically, code that cannot be split is printed smaller, with page numbers and offline Mermaid diagrams.",
+  "version": "2.3.0",
   "publisher": "idris1980",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -57,6 +57,18 @@
           "enumDescriptions": ["Split with ` as in PowerShell", "Split with \\ as in Bash", "Split with ^ as in cmd", "Do not split code blocks without a language"],
           "default": "powershell",
           "description": "How code blocks without a language are split."
+        },
+        "copyablePdf.shrinkLongLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Print a code block in a smaller font when it has lines that cannot be split, for example YAML or JSON, so every line still fits and can be copied. The Markdown file is not changed."
+        },
+        "copyablePdf.minCodeFontSize": {
+          "type": "number",
+          "default": 6,
+          "minimum": 4,
+          "maximum": 8.6,
+          "description": "Smallest font size in points for a shrunk code block. The normal size is 8.6 pt. At 6 pt about 136 characters fit on a line."
         },
         "copyablePdf.footer": {
           "type": "boolean",

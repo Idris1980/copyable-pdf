@@ -9,7 +9,7 @@ Most Markdown PDF tools break long commands at the page edge. When someone copie
 Download the latest `copyable-pdf-x.y.z.vsix` from [Releases](https://github.com/Idris1980/copyable-pdf/releases), then either:
 
 - in VS Code: Extensions view → `...` menu → **Install from VSIX...**, or
-- in a terminal: `code --install-extension copyable-pdf-2.2.1.vsix`
+- in a terminal: `code --install-extension copyable-pdf-2.3.0.vsix`
 
 Reload VS Code afterwards (Command Palette → **Developer: Reload Window**).
 
@@ -34,8 +34,9 @@ Tested on Windows with Edge and Chrome. macOS and Linux are supported in the cod
 ## Features
 
 - **Long commands are split automatically in the PDF** with the right continuation character: `` ` `` for PowerShell, `\` for Bash and `^` for cmd. Lines are split before parameters such as `--name`, so each parameter stays with its value. The Markdown file is not changed, and the message afterwards tells you how many lines were split. Code blocks without a language are split as PowerShell (setting `copyablePdf.defaultShell`).
+- **Code that cannot be split is printed smaller:** some languages have no continuation character, for example YAML, JSON and SQL, and a long quoted string cannot be split either. Such a code block is printed in a smaller font, just small enough for its longest line, so every line still fits and can be copied. The smallest size is 6 pt by default, which fits about 136 characters (setting `copyablePdf.minCodeFontSize`). Lines that are longer still get a warning.
 - **Command output is left alone:** if a code block has lines starting with `PS>` or `$`, only those lines count as commands. The other lines are output and may wrap.
-- **Markers while typing:** lines that will be split automatically get a blue marker. Lines that cannot be split, for example because of a long quoted string, get a yellow warning and show up under Problems.
+- **Markers while typing:** lines that will be split automatically or printed smaller get a blue marker. Lines that are too long even at the smallest size get a yellow warning with advice that fits the language, for example to write YAML in block style instead of `{...}` on one line. They show up under Problems.
 - **Verification afterwards:** the finished PDF is read with PDFium, the same engine Edge and Chrome use when you copy text. Code lines that cannot be copied in full are marked red.
 - **Split in the file too:** to change the Markdown file itself, put the cursor on the line and press `Ctrl+.`.
 - **Footer** with the document title and "Page 3 of 12".
@@ -50,6 +51,8 @@ Tested on Windows with Edge and Chrome. macOS and Linux are supported in the cod
 | `copyablePdf.maxCodeLine` | 95 | Longest code line before it is split or flagged |
 | `copyablePdf.autoSplit` | on | Split long commands in the PDF |
 | `copyablePdf.defaultShell` | powershell | How code blocks without a language are split: powershell, bash, cmd or none |
+| `copyablePdf.shrinkLongLines` | on | Print a code block smaller when it has lines that cannot be split |
+| `copyablePdf.minCodeFontSize` | 6 | Smallest font size in points for such a block. The normal size is 8.6 pt |
 | `copyablePdf.footer` | on | Title and page numbers in the footer |
 | `copyablePdf.openAfter` | on | Open the PDF when it is ready |
 | `copyablePdf.verify` | on | Verify the PDF afterwards (requires Python) |
@@ -64,8 +67,16 @@ No Node.js is needed. The extension is plain JavaScript, and `build.py` packages
 git clone https://github.com/Idris1980/copyable-pdf.git
 cd copyable-pdf
 python build.py
-code --install-extension copyable-pdf-2.2.1.vsix
+code --install-extension copyable-pdf-2.3.0.vsix
 ```
+
+## Changes
+
+**2.3.0**
+
+- Code blocks with lines that cannot be split, for example YAML or JSON, are printed in a smaller font so the lines can still be copied.
+- New settings `copyablePdf.shrinkLongLines` and `copyablePdf.minCodeFontSize`.
+- Better advice for long lines. Code blocks in a language without a continuation character no longer get the advice to add a language.
 
 ## License
 

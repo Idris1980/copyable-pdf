@@ -6,6 +6,8 @@ const { execFileSync } = require("child_process");
 const markdownit = require("./media/markdown-it.min.js");
 
 const MEDIA = path.join(__dirname, "media");
+// Font size of code blocks in style.css. A smaller size is used for blocks with lines that cannot be split.
+const CODE_PT = 8.6;
 const FENCE = /^\s{0,3}(`{3,}|~{3,})\s*([\w-]*)/;
 const PROMPT = /^\s*(PS( [^>]*)?>|\$)\s/;
 
@@ -71,7 +73,10 @@ function render(text, file, { footer = true, github = githubBase(path.dirname(fi
   md.renderer.rules.fence = (tokens, i, opt, env, self) => {
     const t = tokens[i];
     if (t.info.trim().toLowerCase() === "mermaid") return `<pre class="mermaid">${escapeHtml(t.content)}</pre>\n`;
-    return defaultFence(tokens, i, opt, env, self);
+    // prepare() marks blocks that need a smaller font with cp-size-<tenths of a point>.
+    const size = t.info.match(/\bcp-size-(\d+)\b/);
+    const html = defaultFence(tokens, i, opt, env, self);
+    return size ? html.replace(/^<pre/, `<pre style="font-size: ${size[1] / 10}pt"`) : html;
   };
 
   // Relative links point to the file on GitHub, since the PDF is read without the repository next to it.
@@ -182,18 +187,45 @@ function promptBlocks(lines) {
   return result;
 }
 
+/** The longest line that fits on an A4 line at the given font size. */
+function fitsAt(max, size) {
+  return Math.floor(max * CODE_PT / size);
+}
+
 /**
  * Prepares the text for the PDF without touching the original: long code lines are split with
- * the continuation character where possible. Returns the new text, which lines were split and
- * which could not be (1-based line numbers in the original), and every code line the PDF should
- * contain, so the verification compares against the right lines.
+ * the continuation character where possible. A code block with lines that cannot be split, for
+ * example YAML or a long quoted string, is printed in a smaller font so the lines still fit, down
+ * to minFontSize. Returns the new text, which lines were split, shrunk or neither (1-based line
+ * numbers in the original), and every code line the PDF should contain, so the verification
+ * compares against the right lines.
  */
-function prepare(text, max, { split = true, defaultShell = "powershell" } = {}) {
-  const out = [], splitLines = [], unsplittable = [], codeLines = [];
+function prepare(text, max, { split = true, defaultShell = "powershell", shrink = true, minFontSize = 6 } = {}) {
+  const out = [], splitLines = [], unsplittable = [], shrunkLines = [], codeLines = [];
   const lines = text.split(/\r?\n/);
   const prompts = promptBlocks(lines);
+  // The open code block: where its fence is in out, and its lines that could not be split.
+  let block = null;
+  const closeBlock = () => {
+    if (!block) return;
+    if (!block.long.length || !shrink) { unsplittable.push(...block.long); block = null; return; }
+    // Small enough for the longest line, but never below minFontSize. Lines that still do not fit get a warning.
+    const size = Math.max(minFontSize, Math.floor(CODE_PT * max / block.longest * 10) / 10);
+    const fence = out[block.fence].replace(/\s+$/, "");
+    out[block.fence] = fence + (fence.match(FENCE)[2] ? "" : " text") + ` cp-size-${Math.round(size * 10)}`;
+    block.long.forEach((l) => (l.length <= fitsAt(max, size) ? shrunkLines.push({ ...l, size }) : unsplittable.push(l)));
+    block = null;
+  };
   eachCodeLine(lines, (line, i, language) => {
-    if (language === null || language === "mermaid") { out.push(line); return; }
+    if (language === null) {
+      out.push(line);
+      if (FENCE.test(line)) {
+        if (block) closeBlock();
+        else block = { fence: out.length - 1, longest: 0, long: [] };
+      }
+      return;
+    }
+    if (language === "mermaid") { out.push(line); return; }
     const nr = i + 1;
     // In a block with prompts (PS> or $), lines without a prompt are command output.
     // Output may wrap, since nobody runs it.
@@ -203,12 +235,16 @@ function prepare(text, max, { split = true, defaultShell = "powershell" } = {}) 
       const char = charFor(language, defaultShell);
       const parts = split && char ? splitLine(line, char, max) : null;
       if (parts) { result = parts; splitLines.push({ line: nr, parts: parts.length, char }); }
-      else unsplittable.push({ line: nr, length: line.length, noLanguage: !char });
+      else {
+        block.long.push({ line: nr, length: line.length, language, noLanguage: language === "" && !char, hasChar: !!char });
+        block.longest = Math.max(block.longest, line.length);
+      }
     }
     out.push(...result);
     if (!output) result.filter((l) => l.trim()).forEach((l) => codeLines.push([nr, l.trim()]));
   });
-  return { text: out.join("\n"), splitLines, unsplittable, codeLines };
+  closeBlock();
+  return { text: out.join("\n"), splitLines, unsplittable, shrunkLines, codeLines };
 }
 
-module.exports = { render, prepare, longCodeLines, splitLine, charFor, CONTINUATION, titleOf, githubBase };
+module.exports = { render, prepare, longCodeLines, splitLine, charFor, fitsAt, CONTINUATION, CODE_PT, titleOf, githubBase };
