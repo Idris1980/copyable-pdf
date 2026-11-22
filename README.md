@@ -68,10 +68,14 @@ No Node.js is needed. The extension is plain JavaScript, and `build.py` packages
 git clone https://github.com/Idris1980/copyable-pdf.git
 cd copyable-pdf
 python build.py
-code --install-extension copyable-pdf-2.3.1.vsix
+code --install-extension copyable-pdf-2.3.2.vsix
 ```
 
 ## Changes
+
+**2.3.2**
+
+- Easier to find on the Marketplace: more search words and the Formatters category.
 
 **2.3.1**
 
